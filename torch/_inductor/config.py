@@ -1322,6 +1322,90 @@ class cuda:
         "TORCHINDUCTOR_CUTLASS_INSTANTIATION_LEVEL", "0"
     )
 
+class sycl:
+    # arch to use for template kernel compilation.
+    # e.g. "70", "75", "80", "90", etc.
+    # When arch is None, Inductor uses torch.cuda.get_device_capability(0).
+    arch: Optional[str] = None
+
+    # CUDA version to use for CUDA template kernel compilation.
+    # e.g. "11.4", "12.1", etc.
+    # When version is None, Inductor uses torch.version.cuda.
+    version: Optional[str] = None
+
+    # Optimization level for the host compiler.
+    compile_opt_level: Literal["-O0", "-O1", "-O2", "-O3", "-OS"] = "-O1"
+
+    # Whether to enable device LTO (link-time-optimization).
+    enable_cuda_lto = False
+
+    # Whether to keep intermediate files dring compilation.
+    enable_ptxas_info = False
+
+    # Whether to enable debug info, e.g. line number, cutlass debug info.
+    enable_debug_info = False
+
+    # Whether to use fast math.
+    use_fast_math = False
+
+    # Path to the CUTLASS repo root directory.
+    # The default path only works under PyTorch local development environment.
+    cutlass_dir = os.environ.get(
+        "TORCHINDUCTOR_CUTLASS_DIR",
+        os.path.abspath(
+            os.path.join(os.path.dirname(torch.__file__), "../third_party/cutlass_sycl/")
+        ),
+    )
+
+    # Configures the maximum number of CUTLASS configs to profile in max_autotune.
+    # By default it's None, so that all CUTLASS configs are tuned.
+    # This is mainly used to reduce test time in CI.
+    cutlass_max_profiling_configs: Optional[int] = None
+
+    # The L2 swizzle values to consider when profiling CUTLASS configs in max_autotune.
+    cutlass_max_profiling_swizzle_options: list[int] = [1, 2, 4]
+
+    # Path to CUDA NVCC.
+    # NVCC search order:
+    # 1) cuda_cxx set in this config
+    # 2) CUDACXX environment variable
+    # 3) CUDA_HOME environment variable
+    # 4) default system search PATH.
+    sycl_cxx: Optional[str] = None
+
+    # Minimum value of M*N*K to consider the CUTLASS backend for GEMM ops.
+    cutlass_backend_min_gemm_size: int = 1
+
+    # enable generation of inline standalone runner in CUDA CPP generated code
+    # which allows to compile the generated code into a standalone executable.
+    generate_test_runner: bool = (
+        os.environ.get("INDUCTOR_CUDA_BACKEND_GENERATE_TEST_RUNNER_CODE", "0") == "1"
+    )
+
+    # Keep only Cutlass op configs which contain this regular expression pattern
+    # Set this to "warpspecialized_cooperative_epi_tma" to enable only SM90 TMA Cutlass Kernels for large GEMMs
+    cutlass_op_allowlist_regex: Optional[str] = None
+
+    # Note: Names of Cutlass ops names can be obtained by calling
+    # op.configuration_name() on a Cutlass op instance, for example those
+    # returned from cutlass_utils.gen_ops() or the op argument passed to
+    # CUTLASSGemmTemplate.render(...)
+
+    # Filter Cutlass configs which contain this regular expression pattern
+    # Set this to "pingpong" to avoid numerical issues
+    # caused by the op ordering of the "pingpong" memory access
+    # pattern used by some Cutlass Kernels.
+    cutlass_op_denylist_regex: Optional[str] = None
+
+    # Non-negative integer which determines how many kernels are instantiated.
+    # 0 = 0000 generates the fewest kernels, 9999 generates all possible combinations.
+    # increasing first digit reduces schedule / mixed type pruning,
+    # increasing second digit generates more cluster sizes,
+    # increasing third digit generates more MMA multipliers,
+    # increasing fourth digit generates more instruction shapes.
+    cutlass_instantiation_level: str = os.environ.get(
+        "TORCHINDUCTOR_CUTLASS_INSTANTIATION_LEVEL", "0"
+    )
 
 class rocm:
     # Offload arch list for device code compilation, e.g. ["gfx90a", "gfx942"].

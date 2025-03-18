@@ -2719,6 +2719,8 @@ def _cuda_compiler() -> Optional[str]:
         return os.path.realpath(os.path.join(os.getenv("CUDA_HOME", ""), "bin/nvcc"))
     return "nvcc"
 
+def _sycl_compiler() -> Optional[str]:
+    return "dpcpp"
 
 def _cutlass_include_paths() -> list[str]:
     if config.is_fbcode():
@@ -2846,7 +2848,41 @@ def cuda_compile_command(
     log.debug("CUDA command: %s", res)
     return res
 
-
+def sycl_compile_command(
+    src_files: list[str],
+    dst_file: str,
+    dst_file_ext: str,
+    extra_args: Optional[list[str]] = None,
+) -> str:
+    if extra_args is None:
+        extra_args = []
+    include_paths = _cutlass_include_paths()
+    cuda_lib_options = _cuda_lib_options()
+    nvcc_host_compiler_options = _nvcc_host_compiler_options()
+    nvcc_compiler_options = _nvcc_compiler_options()
+    options = (
+        nvcc_compiler_options
+        + extra_args
+        + [
+            f"-Xcompiler {opt}" if "=" in opt else f"-Xcompiler={opt}"
+            for opt in nvcc_host_compiler_options
+        ]
+        + ["-I" + path for path in include_paths]
+        + cuda_lib_options
+    )
+    src_file = " ".join(src_files)
+    res = ""
+    if dst_file_ext == "o":
+        res = f"{_sycl_compiler()} {' '.join(options)} -c -o {dst_file} {src_file}"
+    elif dst_file_ext == "so":
+        options.append("-shared")
+        res = f"{_sycl_compiler()} {' '.join(options)} -o {dst_file} {src_file}"
+    elif dst_file_ext == "exe":
+        res = f"{_sycl_compiler()} {' '.join(options)} -o {dst_file} {src_file}"
+    else:
+        raise NotImplementedError(f"Unsupported output file suffix {dst_file_ext}!")
+    log.debug("CUDA command: %s", res)
+    return res
 class DLLWrapper:
     """A wrapper for a dynamic library."""
 
